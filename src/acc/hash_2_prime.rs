@@ -4,8 +4,8 @@ use std::{
 };
 
 use bigdecimal::BigDecimal;
-use num_bigint_dig::{prime::probably_prime, BigUint, ToBigUint};
-use num_traits::{FromPrimitive, One, Pow, ToPrimitive};
+use num_bigint_dig::{prime::probably_prime, BigUint};
+use num_traits::{FromPrimitive, One, ToPrimitive};
 
 fn fu(x: &BigUint) -> BigUint {
     let u = x.clone();

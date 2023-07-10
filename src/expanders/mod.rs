@@ -1,7 +1,6 @@
 pub mod generate_expanders;
 pub mod generate_idle_file;
 
-use anyhow::{Context, Result};
 use num_traits::ToPrimitive;
 
 pub use generate_idle_file::new_hash;
