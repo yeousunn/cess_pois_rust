@@ -50,7 +50,11 @@ pub fn verify_insert_update(
     let mut count = 1;
     let mut p = exist.clone();
     while let Some(p_node) = Some(p.clone()) {
-        let sub_acc = generate_acc(&key.clone(), &p_node.wit.clone(), vec![accs[count - 1].clone()]);
+        let sub_acc = generate_acc(
+            &key.clone(),
+            &p_node.wit.clone(),
+            vec![accs[count - 1].clone()],
+        );
         if sub_acc != Some(accs[count].clone()) {
             return false;
         }

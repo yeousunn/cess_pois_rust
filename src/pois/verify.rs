@@ -1,15 +1,15 @@
 use anyhow::{anyhow, bail, Context, Ok, Result};
 use core::panic;
-use merkle_light::hash;
 use rand::Rng;
-use sha2::{Digest, Sha512};
+use sha2::Digest;
 use std::collections::HashMap;
 use std::mem;
 
 use super::prove::{AccProof, Commit, CommitProof, DeletionProof, SpaceProof};
-use crate::acc::multi_level_acc::{verify_delete_update, verify_mutilevel_acc, verify_insert_update};
+use crate::acc::multi_level_acc::{
+    verify_delete_update, verify_insert_update, verify_mutilevel_acc,
+};
 use crate::acc::RsaKey;
-// use crate::acc::multi_level_acc::verify_insert_update;
 use crate::expanders::generate_idle_file::{get_hash, HASH_SIZE};
 use crate::expanders::{
     generate_expanders::calc_parents as generate_expanders_calc_parents,
@@ -344,12 +344,7 @@ impl Verifier {
         Ok(())
     }
 
-    pub fn verify_acc(
-        &mut self,
-        id: &[u8],
-        chals: Vec<Vec<i64>>,
-        proof: AccProof,
-    ) -> Result<()> {
+    pub fn verify_acc(&mut self, id: &[u8], chals: Vec<Vec<i64>>, proof: AccProof) -> Result<()> {
         let id_str = hex::encode(id);
 
         if let Some(p_node) = self.nodes.get_mut(&id_str) {
@@ -369,14 +364,20 @@ impl Verifier {
             let mut label = vec![0u8; id.len() + 8 + HASH_SIZE as usize];
 
             for i in 0..chals.len() {
-                if chals[i][0] != proof.indexs[i] || chals[i][0] != p_node.record.as_ref().unwrap().rear + i as i64 + 1 {
+                if chals[i][0] != proof.indexs[i]
+                    || chals[i][0] != p_node.record.as_ref().unwrap().rear + i as i64 + 1
+                {
                     let err = anyhow!("bad file index");
                     bail!("verify acc proofs error: {}", err);
                 }
 
                 copy_data(
                     &mut label,
-                    &[id, &get_bytes(chals[i][0]), &p_node.commit_buf[i + index as usize].roots[self.expanders.k as usize]],
+                    &[
+                        id,
+                        &get_bytes(chals[i][0]),
+                        &p_node.commit_buf[i + index as usize].roots[self.expanders.k as usize],
+                    ],
                 );
 
                 if !get_hash(&label).eq(&proof.labels[i]) {
@@ -397,7 +398,10 @@ impl Verifier {
             }
 
             p_node.record.as_mut().unwrap().acc = proof.acc_path.last().cloned().unwrap();
-            p_node.commit_buf.splice(index as usize..(index as usize + chals.len()) as usize, std::iter::empty());
+            p_node.commit_buf.splice(
+                index as usize..(index as usize + chals.len()) as usize,
+                std::iter::empty(),
+            );
             p_node.buf_size -= chals.len() as i32;
             p_node.record.as_mut().unwrap().rear += chals.len() as i64;
         } else {

@@ -3,10 +3,10 @@ pub mod multi_level_acc;
 
 use num_bigint_dig::{BigUint, RandBigInt};
 use num_integer::Integer;
-use num_traits::{One, Zero};
+use num_traits::One;
 use rsa::{traits::PublicKeyParts, RsaPrivateKey};
 
-use self::{hash_2_prime::h_prime, multi_level_acc::WitnessNode};
+use hash_2_prime::h_prime;
 
 #[derive(Clone, Debug)]
 pub struct RsaKey {
