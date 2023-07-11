@@ -6,15 +6,13 @@ pub mod util;
 
 #[cfg(test)]
 mod tests {
-    use crate::pois::{verify::Verifier, prove::Commit};
+    use crate::{pois::{verify::Verifier, prove::{Commit, CommitProof, AccProof, SpaceProof, DeletionProof}}, acc::RsaKey};
 
     use super::*;
 
     #[test]
     fn test_receive_commits() {
-        let mut verifier = Verifier::new(7, 512, 64);
-        let key = acc::rsa_keygen(2048);
-        let id = b"test miner id";
+        let (mut verifier, key, id) = init_fields();
 
         // Register prover node with the verifier
         verifier.register_prover_node(id, key.clone(), key.g.to_string().as_bytes(), 0, 0);
@@ -27,9 +25,7 @@ mod tests {
 
     #[test]
     fn test_commit_challenges() {
-        let mut verifier = Verifier::new(7, 512, 64);
-        let key = acc::rsa_keygen(2048);
-        let id = b"test miner id";
+        let (mut verifier, key, id) = init_fields();
 
         // Register prover node with the verifier
         verifier.register_prover_node(id, key.clone(), key.g.to_string().as_bytes(), 0, 0);
@@ -47,9 +43,7 @@ mod tests {
 
     #[test]
     fn test_space_challenges() {
-        let mut verifier = Verifier::new(7, 512, 64);
-        let key = acc::rsa_keygen(2048);
-        let id = b"test miner id";
+        let (mut verifier, key, id) = init_fields();
 
         // Register prover node with the verifier
         verifier.register_prover_node(id, key.clone(), key.g.to_string().as_bytes(), 0, 0);
@@ -57,6 +51,96 @@ mod tests {
         let chals = verifier.space_challenges(22);
 
         println!("{:?}", chals);
+    }
+
+    #[test]
+    fn test_verify_commit_proofs(){
+        let (mut verifier, key, id) = init_fields();
+
+        // Register prover node with the verifier
+        verifier.register_prover_node(id, key.clone(), key.g.to_string().as_bytes(), 0, 0);
+
+        let mut commits = init_commit();
+
+        if !verifier.receive_commits(id, &mut commits) {
+            assert!(false);
+        }
+
+        // To test replace this with vector of CommitProof with data
+        let proofs: Vec<Vec<CommitProof>>= Vec::new();
+
+        if let Ok(chals) = verifier.commit_challenges(id, 0, 4) {
+            if let Err(err) = verifier.verify_commit_proofs(id, chals, proofs) {
+                eprintln!("{}", err);
+                assert!(false)
+            }
+        }
+    }
+
+    #[test]
+    fn test_verify_acc(){
+        let (mut verifier, key, id) = init_fields();
+
+        // Register prover node with the verifier
+        verifier.register_prover_node(id, key.clone(), key.g.to_string().as_bytes(), 0, 0);
+
+        let mut commits = init_commit();
+
+        if !verifier.receive_commits(id, &mut commits) {
+            assert!(false);
+        }
+
+        // To test replace this with AccProof object
+        let proofs: AccProof=  AccProof { ..Default::default() };
+
+        if let Ok(chals) = verifier.commit_challenges(id, 0, 4) {
+            if let Err(err) = verifier.verify_acc(id, chals, proofs) {
+                eprintln!("{}", err);
+                assert!(false)
+            }
+        }
+    }
+
+    #[test]
+    fn test_verify_space() {
+        let (mut verifier, key, id) = init_fields();
+
+        // Register prover node with the verifier
+        verifier.register_prover_node(id, key.clone(), key.g.to_string().as_bytes(), 0, 0);
+
+        if let Ok(p_node) = verifier.get_node(id) {
+            if let Ok(space_chals) = verifier.space_challenges(22) {
+                let space_proof = SpaceProof{ ..Default::default() };
+                if let Err(err) = verifier.verify_space(p_node, space_chals, &space_proof) {
+                    eprintln!("{}", err);
+                    assert!(false)
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_verify_deletion(){
+        let (mut verifier, key, id) = init_fields();
+
+        // Register prover node with the verifier
+        verifier.register_prover_node(id, key.clone(), key.g.to_string().as_bytes(), 0, 0);
+
+        let deletion_proof = DeletionProof {
+            ..Default::default()
+        };
+        if let Err(err) = verifier.verify_deletion(id, &deletion_proof) {
+            eprintln!("{}", err);
+            assert!(false)
+        }
+    }
+
+    fn init_fields() -> (Verifier, RsaKey, &'static[u8]) {
+        let verifier = Verifier::new(7, 512, 64);
+        let key = acc::rsa_keygen(2048);
+        let id = b"test miner id";
+
+        (verifier, key, id)
     }
 
     fn init_commit() -> Vec<Commit> {

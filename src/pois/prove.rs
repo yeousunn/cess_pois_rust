@@ -22,6 +22,7 @@ pub struct CommitProof {
     pub parents: Vec<MhtProof>,
 }
 
+#[derive(Default)]
 pub struct AccProof {
     pub indexs: Vec<i64>,
     pub labels: Vec<Vec<u8>>,
@@ -29,7 +30,7 @@ pub struct AccProof {
     pub acc_path: Vec<Vec<u8>>,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Default, Deserialize, Serialize)]
 pub struct SpaceProof {
     pub left: i64,
     pub right: i64,
@@ -38,7 +39,7 @@ pub struct SpaceProof {
     pub wit_chains: Vec<WitnessNode>,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone,Default, Deserialize, Serialize)]
 pub struct DeletionProof {
     pub roots: Vec<Vec<u8>>,
     pub wit_chain: WitnessNode,

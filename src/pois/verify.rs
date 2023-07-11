@@ -72,7 +72,7 @@ impl Verifier {
         self.nodes.insert(id, node);
     }
 
-    pub fn get_mode(&self, id: &[u8]) -> Result<&ProverNode> {
+    pub fn get_node(&self, id: &[u8]) -> Result<&ProverNode> {
         let id = hex::encode(id);
         let node = self
             .nodes
@@ -113,15 +113,12 @@ impl Verifier {
             return false;
         }
 
-        let mut is_valid_commit = false;
         if commits.len() > (MAX_BUF_SIZE - p_node.buf_size) as usize {
             let commits = &mut commits[..(MAX_BUF_SIZE - p_node.buf_size) as usize];
-            is_valid_commit = self.validate_commit(&p_node, commits);
+            return self.validate_commit(&p_node, commits);
         } else {
-            is_valid_commit = self.validate_commit(&p_node, commits);
+            return self.validate_commit(&p_node, commits);
         }
-
-        is_valid_commit
     }
 
     fn validate_commit(&mut self, p_node: &ProverNode, commits: &mut [Commit]) -> bool {
