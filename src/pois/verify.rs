@@ -21,13 +21,13 @@ use crate::tree::{check_index_path, verify_path_proof, PathProof};
 use crate::util::copy_data;
 use crate::{acc, expanders};
 
-pub const MAX_BUF_SIZE: i32 = 1 * 16;
-pub static mut SPACE_CHALS: i64 = 22;
-pub const PICK: i32 = 1;
+pub const IDLE_SET_LEN: i64 = 64;
+pub static mut SPACE_CHALS: i64 = 8;
+pub static mut PICK: i32 = 4;
 
 #[derive(Clone, Debug)]
 pub struct Record {
-    pub key: acc::RsaKey,
+    pub key: RsaKey,
     pub acc: Vec<u8>,
     pub front: i64,
     pub rear: i64,
@@ -35,9 +35,8 @@ pub struct Record {
 }
 #[derive(Clone, Debug)]
 pub struct ProverNode {
-    pub id: Vec<u8>,
-    pub commit_buf: Vec<Commit>,
-    pub buf_size: i32,
+    pub id: Vec<u8>, // Prover ID(generally, use AccountID)
+    pub commits_buf: Commit,
     pub record: Option<Record>,
 }
 
@@ -50,7 +49,7 @@ pub struct Verifier {
 impl Verifier {
     pub fn new(k: i64, n: i64, d: i64) -> Self {
         unsafe {
-            SPACE_CHALS = (n as f64).log2().floor() as i64;
+            SPACE_CHALS = k; //(n as f64).log2().floor() as i64;
         }
 
         Verifier {
@@ -67,30 +66,30 @@ impl Verifier {
         front: i64,
         rear: i64,
     ) {
-        let node = ProverNode::new(&id, key, acc, front, rear);
-        let id = hex::encode(id);
-        self.nodes.insert(id, node);
+        let id_str = hex::encode(id);
+        let node = ProverNode::new(id, key, acc, front, rear);
+        self.nodes.insert(id_str, node);
     }
 
     pub fn get_node(&self, id: &[u8]) -> Result<&ProverNode> {
-        let id = hex::encode(id);
+        let id_str = hex::encode(id);
         let node = self
             .nodes
-            .get(&id)
+            .get(&id_str)
             .with_context(|| format!("Node not found."))?;
         Ok(node)
     }
 
     pub fn is_logout(&self, id: &[u8]) -> bool {
-        let id = hex::encode(id);
-        !self.nodes.contains_key(&id)
+        let id_str = hex::encode(id);
+        !self.nodes.contains_key(&id_str)
     }
 
     pub fn logout_prover_node(&self, id: &[u8]) -> Result<(Vec<u8>, i64, i64)> {
-        let id = hex::encode(id);
+        let id_str = hex::encode(id);
         let node = self
             .nodes
-            .get(&id)
+            .get(&id_str)
             .with_context(|| format!("Node not found."))?;
 
         let (acc, front, rear) = match &node.record {
@@ -101,106 +100,94 @@ impl Verifier {
         Ok((acc, front, rear))
     }
 
-    pub fn receive_commits(&mut self, id: &[u8], commits: &mut [Commit]) -> bool {
-        let id = hex::encode(id);
+    pub fn receive_commits(&mut self, id: &[u8], commits: &Commit) -> bool {
+        let id_str = hex::encode(id);
 
-        let p_node = match self.nodes.get(&id) {
+        let mut p_node = match self.nodes.get_mut(&id_str) {
             Some(node) => node.clone(),
             None => return false,
         };
 
-        if !p_node.id.eq(&hex::decode(id).unwrap()) {
+        if !p_node.id.eq(&hex::decode(id_str).unwrap()) {
             return false;
         }
 
-        if commits.len() > (MAX_BUF_SIZE - p_node.buf_size) as usize {
-            let commits = &mut commits[..(MAX_BUF_SIZE - p_node.buf_size) as usize];
-            return self.validate_commit(&p_node, commits);
-        } else {
-            return self.validate_commit(&p_node, commits);
+        for i in 0..commits.file_indexs.len() {
+            if commits.file_indexs[i as usize] <= p_node.record.as_ref().unwrap().front {
+                return false
+            }
         }
-    }
-
-    fn validate_commit(&mut self, p_node: &ProverNode, commits: &mut [Commit]) -> bool {
-        let mut p_node = p_node.clone();
-        for i in 0..commits.len() {
-            if commits[i].file_index <= p_node.record.as_ref().unwrap().front {
-                return false;
-            }
-
-            if commits[i].roots.len() != (self.expanders.k + 2) as usize {
-                return false;
-            }
-            // TODO: find a way to reset the hasher instead of creating new object
-            let hash = new_hash();
-            let result = match hash {
-                // TODO: write a generic function for the below task.
-                ExpanderHasher::SHA256(hash) => {
-                    let mut hash = hash;
-                    for j in 0..commits[i].roots.len() - 1 {
-                        hash.update(&commits[i].roots[j]);
-                    }
-
-                    let result = hash.finalize();
-                    result.to_vec()
+        
+        if commits.roots.len() != ((self.expanders.k + 1) * IDLE_SET_LEN + 1) as usize {
+            return false
+        }
+        let hash = new_hash();
+        let result = match hash {
+            ExpanderHasher::SHA256(hash) => {
+                let mut hash = hash;
+                for j in 0..(commits.roots.len() - 1) {
+                    hash.update(commits.roots[j]);
                 }
-                ExpanderHasher::SHA512(hash) => {
-                    let mut hash = hash;
-                    for j in 0..commits[i].roots.len() - 1 {
-                        hash.update(&commits[i].roots[j]);
-                    }
-
-                    let result = hash.finalize();
-                    result.to_vec()
+                let result = hash.finalize();
+                result.to_vec()
+            },
+            ExpanderHasher::SHA512(hash) => {
+                let mut hash = hash;
+                for j in 0..(commits.roots.len() - 1) {
+                    hash.update(commits.roots[j]);
                 }
-            };
 
-            if commits[i].roots[self.expanders.k as usize + 1] != result[..] {
-                return false;
+                let result = hash.finalize();
+                result.to_vec()
             }
-
-            p_node.commit_buf.push(commits[i].clone());
-            p_node.buf_size += 1;
-        }
-        if let Some(node) = self.nodes.get_mut(&hex::encode(&p_node.id)) {
-            *node = p_node;
+        };
+        
+        if commits.roots[commits.roots.len() - 1].eq(&result) {
+            return false
         }
 
-        true
+        p_node.commits_buf = commits.clone();
+
+        return true
+        
     }
 
     pub fn commit_challenges(&mut self, id: &[u8], left: i32, right: i32) -> Result<Vec<Vec<i64>>> {
         let id = hex::encode(id);
-        let p_node = self
+        let p_node = match self
             .nodes
-            .get(&id)
-            .with_context(|| format!("Prover node not found"))?;
-
-        if right - left <= 0 || right > p_node.buf_size || left < 0 {
-            let err = anyhow!("bad file number");
-            bail!("generate commit challenges error: {}", err);
-        }
-        let mut challenges: Vec<Vec<i64>> = Vec::with_capacity((right - left) as usize);
+            .get(&id) {
+                Some(p) => { p },
+                None => {
+                    let err = anyhow!("prover node not found");
+                    bail!("generate commit challenges error: {}", err);
+                }
+            };
+        
+        let mut challenges: Vec<Vec<i64>> = Vec::with_capacity(p_node.commits_buf.file_indexs.len());
         let mut rng = rand::thread_rng();
-        for i in left..right {
-            // let idx = i - left;
-            let mut inner_vec = vec![0; self.expanders.k as usize + 2];
-            inner_vec[0] = p_node.commit_buf[i as usize].file_index;
-            let r = rng.gen_range(0..self.expanders.n);
-            inner_vec[1] = r + self.expanders.n * self.expanders.k;
+        for i in 0..p_node.commits_buf.file_indexs.len() {
+            challenges[i] = Vec::with_capacity((self.expanders.k+2) as usize);
+            challenges[i][0] = p_node.commits_buf.file_indexs[i];
+            let mut r = rng.gen_range(0..self.expanders.n);
+            r += self.expanders.n * self.expanders.k;
+            challenges[i][1] = r;
 
-            for j in 2..=(self.expanders.k + 1) as usize {
-                let r = rng.gen_range(0..(self.expanders.d + 1));
-                inner_vec[j] = r;
+            for j in 2..(self.expanders.k+2) as usize {
+                let mut r = rng.gen_range(0..self.expanders.d+1);
+                challenges[i][j] = r;
             }
-
-            challenges.push(inner_vec);
         }
         Ok(challenges)
     }
 
     pub fn space_challenges(&self, params: i64) -> Result<Vec<i64>> {
-        //let mut inner_vec = vec![0; self.expanders.k as usize + 2];
+        let mut params = params;
+        unsafe {
+            if params < SPACE_CHALS {
+                params = SPACE_CHALS
+            }
+        }
         let mut challenges: Vec<i64> = vec![0; params as usize];
         let mut mp: HashMap<i64, ()> = HashMap::new();
         let mut rng = rand::thread_rng();
@@ -227,27 +214,28 @@ impl Verifier {
         proofs: Vec<Vec<CommitProof>>,
     ) -> Result<()> {
         let id_str = hex::encode(id);
-        let p_node = self
+        let p_node = match self
             .nodes
-            .get(&id_str)
-            .with_context(|| format!("Prover node not found"))?;
+            .get(&id_str) {
+                Some(p) => { p },
+                None => {
+                    let err = anyhow!("prover node not found");
+                    bail!("verify commit proofs error: {}", err);
+                }
+            };
+            
 
-        if chals.len() != proofs.len() || chals.len() > p_node.buf_size as usize {
+        if chals.len() != proofs.len() || chals.len() != IDLE_SET_LEN as usize {
             let err = anyhow!("bad proof data");
             bail!("verify commit proofs error: {}", err);
         }
 
-        if let Err(err) = self.verify_node_dependencies(id, chals.clone(), proofs.clone(), PICK) {
-            bail!("verify commit proofs error {}", err);
-        }
-
-        let mut index = 0;
-        for i in 0..p_node.buf_size {
-            if chals[0][0] == p_node.commit_buf[i as usize].file_index {
-                index = i;
-                break;
+        unsafe {
+            if let Err(err) = self.verify_node_dependencies(id, chals.clone(), proofs.clone(), PICK) {
+                bail!("verify commit proofs error {}", err);
             }
         }
+        
         let front_side = (mem::size_of::<NodeType>() + id.len() + 8) as i32;
         let hash_size = HASH_SIZE;
         let mut label =
@@ -267,7 +255,7 @@ impl Verifier {
                 }
 
                 let layer = idx as i64 / self.expanders.n;
-                let mut root = &p_node.commit_buf[index as usize + i].roots[layer as usize];
+                let mut root = &p_node.commits_buf.roots[layer as usize * IDLE_SET_LEN as usize + (chals[i][0] as usize - 1) % IDLE_SET_LEN as usize];
                 let path_proof = PathProof {
                     locs: proofs[i][j - 1].node.locs.clone(),
                     path: proofs[i][j - 1].node.paths.clone(),
@@ -278,32 +266,40 @@ impl Verifier {
                     bail!("verify commit proofs error {}", err);
                 }
 
-                if proofs[i][j - 1].parents.len() <= 0 {
-                    continue;
-                }
-
                 copy_data(&mut label, &[id, &get_bytes(chals[i][0]), &get_bytes(idx)]);
-
-                let mut size = front_side;
-
-                for p in &proofs[i][j - 1].parents {
-                    if p.index as i64 >= layer * self.expanders.n {
-                        root = &p_node.commit_buf[index as usize + i as usize].roots[layer as usize]
-                    } else {
-                        root = &p_node.commit_buf[index as usize + i as usize].roots
-                            [layer as usize - 1]
+                if layer > 0 {
+                    let mut size = front_side;
+                    for p in &proofs[i][j - 1].parents {
+                        if p.index as i64 >= layer * self.expanders.n {
+                            root = &p_node.commits_buf.roots[layer as usize * IDLE_SET_LEN as usize + (chals[i][0] as usize - 1) % IDLE_SET_LEN as usize]
+                        } else {
+                            root = &p_node.commits_buf.roots
+                                [(layer as usize - 1) * IDLE_SET_LEN as usize + (chals[i][0] as usize - 1) % IDLE_SET_LEN as usize]
+                        }
+                        let path_proof = PathProof {
+                            locs: p.locs.clone(),
+                            path: p.paths.clone(),
+                        };
+                        if verify_path_proof(root, &p.label, path_proof) {
+                            let err = anyhow!("verify parent path proof error");
+                            bail!("verify commit proofs error: {}", err);
+                        }
+                        label[(size as usize)..(size + HASH_SIZE) as usize].copy_from_slice(&p.label);
+                        size += HASH_SIZE
                     }
-                    let path_proof = PathProof {
-                        locs: p.locs.clone(),
-                        path: p.paths.clone(),
-                    };
-                    if verify_path_proof(root, &p.label, path_proof) {
-                        let err = anyhow!("verify parent path proof error");
-                        bail!("verify commit proofs error: {}", err);
-                    }
-                    label[(size as usize)..(size + HASH_SIZE) as usize].copy_from_slice(&p.label);
-                    size += HASH_SIZE
+                    
+                    let start = (layer - 1) as usize * IDLE_SET_LEN as usize;
+                    let end = layer as usize * IDLE_SET_LEN as usize;
+                    let roots = &p_node.commits_buf.roots[start..end].iter().map(|i| i.as_slice()).collect::<Vec<&[u8]>>()[..];
+                    
+                    copy_data(&mut label, roots);
                 }
+               
+                // TODO: Paused work here for now.
+                // let mut hash;
+                // ifchals[i][1]- 1 % IDLE_SET_LEN >0{
+                // }
+
                 if !get_hash(&label).eq(&proofs[i][j - 1].node.label) {
                     let err = anyhow!("verify label error");
                     bail!("verify commit proofs error: {}", err);
@@ -352,7 +348,7 @@ impl Verifier {
 
             let mut index = 0;
             for i in 0..p_node.buf_size {
-                if chals[0][0] == p_node.commit_buf[i as usize].file_index {
+                if chals[0][0] == p_node.commits_buf[i as usize].file_index {
                     index = i;
                     break;
                 }
@@ -373,7 +369,7 @@ impl Verifier {
                     &[
                         id,
                         &get_bytes(chals[i][0]),
-                        &p_node.commit_buf[i + index as usize].roots[self.expanders.k as usize],
+                        &p_node.commits_buf[i + index as usize].roots[self.expanders.k as usize],
                     ],
                 );
 
@@ -395,7 +391,7 @@ impl Verifier {
             }
 
             p_node.record.as_mut().unwrap().acc = proof.acc_path.last().cloned().unwrap();
-            p_node.commit_buf.splice(
+            p_node.commits_buf.splice(
                 index as usize..(index as usize + chals.len()) as usize,
                 std::iter::empty(),
             );
@@ -548,7 +544,7 @@ impl ProverNode {
     pub fn new(id: &[u8], key: RsaKey, acc: &[u8], front: i64, rear: i64) -> Self {
         Self {
             id: id.to_vec(),
-            commit_buf: Vec::<Commit>::with_capacity(MAX_BUF_SIZE as usize),
+            commits_buf: Vec::<Commit>::with_capacity(MAX_BUF_SIZE as usize),
             buf_size: 0,
             record: Some(Record {
                 acc: acc.to_vec(),

@@ -4,7 +4,7 @@ use crate::{acc::multi_level_acc::WitnessNode, expanders::NodeType};
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Commit {
-    pub file_index: i64,
+    pub file_indexs: Vec<i64>,
     pub roots: Vec<Vec<u8>>,
 }
 
@@ -39,7 +39,7 @@ pub struct SpaceProof {
     pub wit_chains: Vec<WitnessNode>,
 }
 
-#[derive(Clone,Default, Deserialize, Serialize)]
+#[derive(Clone, Default, Deserialize, Serialize)]
 pub struct DeletionProof {
     pub roots: Vec<Vec<u8>>,
     pub wit_chain: WitnessNode,
