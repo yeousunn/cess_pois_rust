@@ -8,7 +8,7 @@ pub struct Commit {
     pub roots: Vec<Vec<u8>>,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MhtProof {
     pub index: NodeType,
     pub label: Vec<u8>,
@@ -16,7 +16,7 @@ pub struct MhtProof {
     pub locs: Vec<u8>,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CommitProof {
     pub node: MhtProof,
     pub parents: Vec<MhtProof>,

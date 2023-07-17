@@ -6,6 +6,7 @@ use std::{
 use bigdecimal::BigDecimal;
 use num_bigint_dig::{prime::probably_prime, BigUint};
 use num_traits::{FromPrimitive, One, ToPrimitive};
+use sha2::{Digest, Sha512};
 
 fn fu(x: &BigUint) -> BigUint {
     let u = x.clone();
@@ -29,14 +30,30 @@ fn fu(x: &BigUint) -> BigUint {
     temp1.clone()
 }
 
+// pub fn h_prime(u: &BigUint) -> BigUint {
+//     let mut j = fu(u);
+//     let temp = fu(u);
+//     loop {
+//         let prime = &temp + &j;
+//         if probably_prime(&prime, 10) {
+//             return prime;
+//         }
+//         j += BigUint::from_u32(1u32).unwrap();
+//     }
+// }
+
 pub fn h_prime(u: &BigUint) -> BigUint {
-    let mut j = fu(u);
-    let temp = fu(u);
+    let mut h = Sha512::new();
+    h.update(u.to_bytes_be());
+    let huj = fu(&BigUint::from_bytes_be(h.finalize().as_slice()));
+    let mut j = huj.clone();
+    let temp = huj;
+
     loop {
         let prime = &temp + &j;
         if probably_prime(&prime, 10) {
             return prime;
         }
-        j += BigUint::from_u32(1u32).unwrap();
+        j += BigUint::from(1u32);
     }
 }

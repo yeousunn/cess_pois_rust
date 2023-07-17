@@ -10,7 +10,7 @@ const DEFAULT_LEVEL: i32 = 3;
 // const DEFAULT_NAME: &str = "sub-acc";
 // const DEFAULT_BACKUP_NAME: &str = "backup-sub-acc";
 
-#[derive(Clone, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct WitnessNode {
     pub elem: Vec<u8>,
     pub wit: Vec<u8>,
@@ -19,24 +19,23 @@ pub struct WitnessNode {
 
 pub fn verify_insert_update(
     key: RsaKey,
-    exist: &mut WitnessNode,
+    exist: Option<Box<WitnessNode>>,
     elems: Vec<Vec<u8>>,
     accs: Vec<Vec<u8>>,
     acc: Vec<u8>,
 ) -> bool {
-    if elems.is_empty() || accs.len() < DEFAULT_LEVEL as usize {
+    if exist.is_none() || elems.len() == 0 || accs.len() < DEFAULT_LEVEL as usize {
         return false;
     }
 
-    let mut p = exist.clone();
-    // If the condition is true, a new accumulator is inserted
-    while p.acc.as_ref().unwrap().acc.is_some() && p.acc.as_ref().unwrap().elem == p.wit {
-        p = *p.acc.unwrap().clone();
+    let mut p = exist.clone().unwrap().as_ref().clone();
+    while p.acc.is_some() && p.acc.as_ref().unwrap().elem == p.wit {
+        p = p.acc.unwrap().as_ref().clone();
     }
 
     // Proof of the witness of accumulator elements,
     // when the element's accumulator does not exist, recursively verify its parent accumulator
-    if !verify_mutilevel_acc(&key, &mut p.clone(), &acc.clone()) {
+    if !verify_mutilevel_acc(&key, Some(&mut p.clone()), &acc.clone()) {
         return false;
     }
 
@@ -48,18 +47,26 @@ pub fn verify_insert_update(
     }
 
     let mut count = 1;
-    let mut p = exist.clone();
-    while let Some(p_node) = Some(p.clone()) {
-        let sub_acc = generate_acc(
-            &key.clone(),
-            &p_node.wit.clone(),
-            vec![accs[count - 1].clone()],
-        );
-        if sub_acc != Some(accs[count].clone()) {
-            return false;
+    let mut p = Some(*exist.unwrap().clone());
+    let mut sub_acc;
+    while let Some(p_node) = p.and_then(|p| p.acc) {
+        let p_acc = p_node.acc;
+        if let Some(p_acc_inner) = p_acc {
+            sub_acc = generate_acc(
+                &key.clone(),
+                &p_node.wit.clone(),
+                vec![accs[count - 1].clone()],
+            );
+            if sub_acc != Some(accs[count].clone()) {
+                return false;
+            }
+            p = Some(*p_acc_inner);
+            count += 1;
+        } else {
+            break;
         }
-        p = *p_node.acc.unwrap().clone();
-        count += 1;
+        
+        
     }
 
     true
@@ -71,22 +78,20 @@ fn verify_acc(key: &RsaKey, acc: &[u8], u: &[u8], wit: &[u8]) -> bool {
     dash == BigUint::from_bytes_be(acc)
 }
 
-pub fn verify_mutilevel_acc(key: &RsaKey, wits: &WitnessNode, acc: &[u8]) -> bool {
-    let mut current_wit = wits;
-
-    while let Some(acc_node) = &current_wit.acc {
+pub fn verify_mutilevel_acc(key: &RsaKey, wits: Option<&mut WitnessNode>, acc: &[u8]) -> bool {
+    let mut current_wit = wits.unwrap();
+    while let Some(acc_node) = &mut current_wit.acc {
         if !verify_acc(key, &acc_node.elem, &current_wit.elem, &current_wit.wit) {
             return false;
         }
         current_wit = acc_node;
     }
-
-    current_wit.elem == acc
+    current_wit.elem.eq(acc)
 }
 
 pub fn verify_delete_update(
     key: RsaKey,
-    exist: &WitnessNode,
+    exist: &mut WitnessNode,
     elems: Vec<Vec<u8>>,
     accs: Vec<Vec<u8>>,
     acc: &[u8],
@@ -94,7 +99,7 @@ pub fn verify_delete_update(
     if elems.len() == 0 || accs.len() < DEFAULT_LEVEL as usize {
         return false;
     }
-    if !verify_mutilevel_acc(&key, exist, acc) {
+    if !verify_mutilevel_acc(&key, Some(exist), acc) {
         return false;
     }
 
@@ -113,7 +118,7 @@ pub fn verify_delete_update(
         if sub_acc.eq(&Some(accs[count].to_vec())) {
             return false;
         }
-        p = &p.acc.as_ref().unwrap();
+        p = p.acc.as_mut().unwrap();
         count += 1;
     }
 

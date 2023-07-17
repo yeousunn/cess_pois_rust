@@ -22,8 +22,8 @@ pub fn calc_parents(expanders: &Expanders, node: &mut Node, miner_id: &[u8], cou
         &mut content,
         &[
             &miner_id,
-            &count.to_string().as_bytes(),
-            &layer.to_string().as_bytes(),
+            &count.to_be_bytes(),
+            &layer.to_be_bytes(),
         ],
     );
     node.add_parent(node.index - expanders.n as NodeType);

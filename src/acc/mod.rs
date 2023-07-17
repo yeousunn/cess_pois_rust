@@ -13,6 +13,14 @@ pub struct RsaKey {
     pub n: BigUint, //Z/nZ
     pub g: BigUint, // Generator
 }
+impl RsaKey {
+    pub(crate) fn new(n: BigUint, g: BigUint) -> RsaKey {
+        Self {
+            n,
+            g,
+        }
+    }
+}
 
 pub fn rsa_keygen(lambda: usize) -> RsaKey {
     let mut rng = rand::thread_rng();

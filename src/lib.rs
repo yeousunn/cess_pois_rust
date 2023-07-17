@@ -6,10 +6,17 @@ pub mod util;
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+    use std::{fs::File, io::Read};
+
+    use num_bigint_dig::BigUint;
+    use rsa::pkcs1::{pem, DecodeRsaPublicKey};
+    use rsa::RsaPublicKey;
+    use crate::util::parse_key;
     use crate::{
         acc::RsaKey,
         pois::{
-            prove::{AccProof, Commit, CommitProof, DeletionProof, MhtProof, SpaceProof},
+            prove::{AccProof, Commit, CommitProof, DeletionProof, SpaceProof},
             verify::Verifier,
         },
     };
@@ -21,7 +28,7 @@ mod tests {
         let (mut verifier, key, id) = init_fields();
 
         // Register prover node with the verifier
-        verifier.register_prover_node(id, key.clone(), key.g.to_string().as_bytes(), 0, 0);
+        verifier.register_prover_node(id, key.clone(), &key.g.to_bytes_be(), 0, 0);
 
         let mut commits = init_commit();
 
@@ -34,7 +41,7 @@ mod tests {
         let (mut verifier, key, id) = init_fields();
 
         // Register prover node with the verifier
-        verifier.register_prover_node(id, key.clone(), key.g.to_string().as_bytes(), 0, 0);
+        verifier.register_prover_node(id, key.clone(), &key.g.to_bytes_be(), 0, 0);
 
         let mut commits = init_commit();
 
@@ -43,7 +50,7 @@ mod tests {
         }
 
         let chals = verifier.commit_challenges(id, 0, 4);
-
+        println!("{:?}", chals);
         if let Ok(_) = chals {
             assert!(true);
         } else {
@@ -56,7 +63,7 @@ mod tests {
         let (mut verifier, key, id) = init_fields();
 
         // Register prover node with the verifier
-        verifier.register_prover_node(id, key.clone(), key.g.to_string().as_bytes(), 0, 0);
+        verifier.register_prover_node(id, key.clone(), &key.g.to_bytes_be(), 0, 0);
 
         let chals = verifier.space_challenges(22);
 
@@ -72,7 +79,7 @@ mod tests {
         let (mut verifier, key, id) = init_fields();
 
         // Register prover node with the verifier
-        verifier.register_prover_node(id, key.clone(), key.g.to_string().as_bytes(), 0, 0);
+        verifier.register_prover_node(id, key.clone(), &key.g.to_bytes_be(), 0, 0);
 
         let mut commits = init_commit();
 
@@ -95,7 +102,7 @@ mod tests {
         let (mut verifier, key, id) = init_fields();
 
         // Register prover node with the verifier
-        verifier.register_prover_node(id, key.clone(), key.g.to_string().as_bytes(), 0, 0);
+        verifier.register_prover_node(id, key.clone(), &key.g.to_bytes_be(), 0, 0);
 
         let mut commits = init_commit();
 
@@ -121,14 +128,14 @@ mod tests {
         let (mut verifier, key, id) = init_fields();
 
         // Register prover node with the verifier
-        verifier.register_prover_node(id, key.clone(), key.g.to_string().as_bytes(), 0, 0);
+        verifier.register_prover_node(id, key.clone(), &key.g.to_bytes_be(), 0, 0);
 
         if let Ok(p_node) = verifier.get_node(id) {
             if let Ok(space_chals) = verifier.space_challenges(22) {
-                let space_proof = SpaceProof {
+                let mut space_proof = SpaceProof {
                     ..Default::default()
                 };
-                if let Err(err) = verifier.verify_space(p_node, space_chals, &space_proof) {
+                if let Err(err) = verifier.verify_space(p_node, space_chals, &mut space_proof) {
                     eprintln!("{}", err);
                     assert!(false)
                 }
@@ -141,12 +148,12 @@ mod tests {
         let (mut verifier, key, id) = init_fields();
 
         // Register prover node with the verifier
-        verifier.register_prover_node(id, key.clone(), key.g.to_string().as_bytes(), 0, 0);
+        verifier.register_prover_node(id, key.clone(), &key.g.to_bytes_be(), 0, 0);
 
-        let deletion_proof = DeletionProof {
+        let mut deletion_proof = DeletionProof {
             ..Default::default()
         };
-        if let Err(err) = verifier.verify_deletion(id, &deletion_proof) {
+        if let Err(err) = verifier.verify_deletion(id, &mut deletion_proof) {
             eprintln!("{}", err);
             assert!(false)
         }
@@ -154,7 +161,8 @@ mod tests {
 
     fn init_fields() -> (Verifier, RsaKey, &'static [u8]) {
         let verifier = Verifier::new(1, 512, 32);
-        let key = acc::rsa_keygen(2048);
+        // let key = acc::rsa_keygen(2048);
+        let key = parse_key("./key").unwrap();
         let id = b"test miner id";
 
         (verifier, key, id)
