@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+option go_package = "bridge/";
+
+package bridge;
+
+service Bridge {
+    rpc CallGetCommits(EmptyRequest) returns (CommitGroup) {}
+    rpc CallProveCommitAndAcc(Challenge) returns (CommitAndAccProof) {}
+    rpc CallProveSpace(Int64Slice) returns (SpaceProof) {}
+}
+
+message EmptyRequest {}
+
+message ProverAcc {
+    bytes acc = 1;
+}
+
+message MhtProof {
+    int32 index = 1;
+    bytes label = 2;
+    repeated bytes paths = 3;
+    bytes locs = 4;
+}
+  
+message CommitProof {
+    MhtProof node = 1;
+    repeated MhtProof parents = 2;
+}
+
+message CommitProofGroupInner {
+    repeated CommitProof commit_proof = 1;
+}
+
+message CommitProofGroup {
+    repeated CommitProofGroupInner commit_proof_group_inner = 1;
+}
+
+message AccProof {
+    repeated int64 indexs = 1;
+    repeated bytes labels = 2;
+    AccWitnessNode wit_chains = 3;
+    repeated bytes acc_path = 4;
+}
+  
+message AccWitnessNode {
+    bytes elem = 1;
+    bytes wit = 2;
+    AccWitnessNode acc = 3;
+}
+
+message CommitAndAccProof {
+    CommitProofGroup commit_proof_group = 1;
+    AccProof acc_proof = 2;
+}
+
+message Int64Slice {
+    repeated int64 values = 1;
+}
+
+message Challenge {
+    repeated Int64Slice rows = 1;
+}
+
+message Commit {
+    int64 file_index = 1;
+    repeated bytes roots = 2;
+}
+
+message CommitGroup {
+    repeated Commit commit = 1;
+    
+    // This is acc data to set the ProverNode
+    ProverAcc prover_acc = 2;
+}
+
+message SpaceProof {
+    int64 left = 1;
+    int64 right = 2;
+    repeated MhtProofGroup proofs = 3;
+    repeated bytes roots = 4;
+    repeated AccWitnessNode wit_chains = 5;
+}
+
+message MhtProofGroup {
+    repeated MhtProof proofs = 1;
+}
