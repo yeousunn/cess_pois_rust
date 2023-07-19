@@ -39,7 +39,7 @@ pub struct SpaceProof {
     pub wit_chains: Vec<WitnessNode>,
 }
 
-#[derive(Clone, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct DeletionProof {
     pub roots: Vec<Vec<u8>>,
     pub wit_chain: WitnessNode,

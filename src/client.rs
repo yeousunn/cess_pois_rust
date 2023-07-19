@@ -4,10 +4,11 @@ pub mod pois;
 pub mod tree;
 pub mod util;
 
+use anyhow::Result;
 use acc::multi_level_acc::WitnessNode;
 use bridge::bridge_client::BridgeClient;
 use bridge::{Challenge, Int64Slice, EmptyRequest};
-use pois::prove::{MhtProof, SpaceProof};
+use pois::prove::{MhtProof, SpaceProof, DeletionProof};
 use crate::util::parse_key;
 use crate::{
     acc::RsaKey,
@@ -22,7 +23,7 @@ pub mod bridge {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<()> {
     let mut client = BridgeClient::connect("http://[::1]:50051").await?;
 
     let (mut verifier, key, id) = init_fields();
@@ -86,7 +87,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
+
+    let request = tonic::Request::new(EmptyRequest {  });
+    let response = client.call_prove_deletion(request).await?;
+    let bridge_del_proof = response.into_inner();
+    let mut del_proof = convert_to_deletion_proof(&bridge_del_proof);
+    println!("del_proof: {:?}", del_proof);
+    if let Err(err) = verifier.verify_deletion(id, &mut del_proof) {
+        println!("RESPONSE= {:?}", err);
+    }
     Ok(())
+}
+
+pub fn convert_to_deletion_proof(pb_proof: &bridge::DeletionProof) -> DeletionProof {
+    let mut roots: Vec<Vec<u8>> = Vec::new();
+    for root in &pb_proof.roots {
+        roots.push(root.to_vec());
+    }
+
+    let wit_chain = convert_to_witness_node(&pb_proof.wit_chain.as_ref().unwrap());
+
+    let mut acc_path: Vec<Vec<u8>> = Vec::new();
+    for path in &pb_proof.acc_path {
+        acc_path.push(path.to_vec());
+    }
+
+    DeletionProof {
+        roots,
+        wit_chain,
+        acc_path,
+    }
 }
 
 pub fn convert_to_space_proof(message: &bridge::SpaceProof) -> SpaceProof {

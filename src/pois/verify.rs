@@ -272,9 +272,9 @@ impl Verifier {
                     locs: proofs[i][j - 1].node.locs.clone(),
                     path: proofs[i][j - 1].node.paths.clone(),
                 };
-                if verify_path_proof(root, &proofs[i][j - 1].node.label, path_proof) {
+                if !verify_path_proof(root, &proofs[i][j - 1].node.label, path_proof) {
                     let err = anyhow!("verify path proof error");
-                    bail!("verify commit proofs error {}", err);
+                    bail!("verify commit proofs error: {}", err);
                 }
 
                 if proofs[i][j - 1].parents.len() <= 0 {
@@ -295,7 +295,7 @@ impl Verifier {
                         locs: p.locs.clone(),
                         path: p.paths.clone(),
                     };
-                    if verify_path_proof(root, &p.label, path_proof) {
+                    if !verify_path_proof(root, &p.label, path_proof) {
                         let err = anyhow!("verify parent path proof error");
                         bail!("verify commit proofs error: {}", err);
                     }

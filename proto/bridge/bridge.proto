@@ -8,6 +8,7 @@ service Bridge {
     rpc CallGetCommits(EmptyRequest) returns (CommitGroup) {}
     rpc CallProveCommitAndAcc(Challenge) returns (CommitAndAccProof) {}
     rpc CallProveSpace(Int64Slice) returns (SpaceProof) {}
+    rpc CallProveDeletion(EmptyRequest) returns (DeletionProof) {}
 }
 
 message EmptyRequest {}
@@ -84,4 +85,10 @@ message SpaceProof {
 
 message MhtProofGroup {
     repeated MhtProof proofs = 1;
+}
+
+message DeletionProof {
+    repeated bytes roots = 1;
+    AccWitnessNode wit_chain = 2;
+    repeated bytes acc_path = 3;
 }
