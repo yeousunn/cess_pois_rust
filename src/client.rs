@@ -7,7 +7,7 @@ pub mod util;
 use acc::multi_level_acc::WitnessNode;
 use bridge::bridge_client::BridgeClient;
 use bridge::{Challenge, Int64Slice, EmptyRequest};
-use pois::prove::MhtProof;
+use pois::prove::{MhtProof, SpaceProof};
 use crate::util::parse_key;
 use crate::{
     acc::RsaKey,
@@ -59,18 +59,67 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             commit_proofs.push(commit_proof_row);
         }
 
-        if let Err(err) =  verifier.verify_commit_proofs(id, chals.clone(), commit_proofs.clone()){
+        if let Err(err) = verifier.verify_commit_proofs(id, chals.clone(), commit_proofs.clone()){
             println!("RESPONSE= {:?}", err);
         }
         
         let pb_acc_proof = commit_and_acc_proof.acc_proof.unwrap();
         let acc_proof = convert_to_acc_proof(&pb_acc_proof);
-        if let Err(err) =  verifier.verify_acc(id, chals, acc_proof){
+        if let Err(err) = verifier.verify_acc(id, chals, acc_proof){
             println!("RESPONSE= {:?}", err);
         }
     } 
 
+    let space_chals = verifier.space_challenges(22);
+    if let Ok(space_chals) = space_chals {
+        let mut int64_slice = Int64Slice::default();
+        int64_slice.values = space_chals.clone();
+        let request = tonic::Request::new(int64_slice);
+        let response = client.call_prove_space(request).await?;
+        let bridge_space_proof = response.into_inner();
+
+        let mut space_proof = convert_to_space_proof(&bridge_space_proof);
+
+        if let Ok(p_node) = verifier.get_node(id) {
+            if let Err(err) = verifier.verify_space(p_node, space_chals, &mut space_proof) {
+                println!("A RESPONSE= {:?}", err);
+            }
+        }
+    }
     Ok(())
+}
+
+pub fn convert_to_space_proof(message: &bridge::SpaceProof) -> SpaceProof {
+    let mut proofs = Vec::new();
+    for proof_group in &message.proofs {
+        let mut mht_proof_group = Vec::new();
+        for proof in &proof_group.proofs {
+            let mht_proof = MhtProof {
+                index: proof.index,
+                label: proof.label.clone(),
+                paths: proof.paths.clone(),
+                locs: proof.locs.clone(),
+            };
+            mht_proof_group.push(mht_proof);
+        }
+        proofs.push(mht_proof_group);
+    }
+
+    let roots = message.roots.clone();
+    
+    let mut wit_chains = Vec::new();
+    for wit_chain in &message.wit_chains {
+        let witness_node = convert_to_witness_node(wit_chain);
+        wit_chains.push(witness_node);
+    }
+    
+    SpaceProof {
+        left: message.left,
+        right: message.right,
+        proofs,
+        roots,
+        wit_chains,
+    }
 }
 
 fn convert_to_acc_proof(pb_acc_proof: &bridge::AccProof) -> AccProof {

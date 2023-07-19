@@ -1,5 +1,6 @@
 pub mod generate_expanders;
 pub mod generate_idle_file;
+use std::mem;
 
 use num_traits::ToPrimitive;
 
@@ -94,7 +95,15 @@ impl Node {
 }
 
 pub fn get_bytes<T: ToPrimitive>(v: T) -> Vec<u8> {
-    v.to_i64().unwrap().to_be_bytes().to_vec()
+    let size = mem::size_of::<T>();
+    let value = v.to_i64().unwrap();
+    let mut bytes = vec![0; size];
+
+    for i in 0..size {
+        bytes[size - 1 - i] = ((value >> (8 * i)) & 0xFF) as u8;
+    }
+
+    bytes
 }
 
 fn bytes_to_node_value(data: &[u8], max: i64) -> NodeType {

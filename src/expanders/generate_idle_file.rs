@@ -19,7 +19,7 @@ pub fn get_hash(data: &Vec<u8>) -> Vec<u8> {
     let hash = new_hash();
     let mut data = data.clone();
     if data.is_empty() {
-        data.copy_from_slice(b"none");
+        data = b"none".to_vec();
     }
     let result = match hash {
         Hasher::SHA256(hash) => {

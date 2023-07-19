@@ -171,6 +171,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bigdecimal",
+ "byteorder",
+ "bytes",
  "hex",
  "merkle_light",
  "num-bigint-dig",

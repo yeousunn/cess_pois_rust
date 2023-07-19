@@ -6,12 +6,6 @@ pub mod util;
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-    use std::{fs::File, io::Read};
-
-    use num_bigint_dig::BigUint;
-    use rsa::pkcs1::{pem, DecodeRsaPublicKey};
-    use rsa::RsaPublicKey;
     use crate::util::parse_key;
     use crate::{
         acc::RsaKey,
@@ -20,8 +14,6 @@ mod tests {
             verify::Verifier,
         },
     };
-
-    use super::*;
 
     #[test]
     fn test_receive_commits() {
@@ -50,7 +42,7 @@ mod tests {
         }
 
         let chals = verifier.commit_challenges(id, 0, 4);
-        println!("{:?}", chals);
+
         if let Ok(_) = chals {
             assert!(true);
         } else {

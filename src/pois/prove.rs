@@ -30,7 +30,7 @@ pub struct AccProof {
     pub acc_path: Vec<Vec<u8>>,
 }
 
-#[derive(Clone, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct SpaceProof {
     pub left: i64,
     pub right: i64,

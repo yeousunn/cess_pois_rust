@@ -272,7 +272,6 @@ impl Verifier {
                     locs: proofs[i][j - 1].node.locs.clone(),
                     path: proofs[i][j - 1].node.paths.clone(),
                 };
-
                 if verify_path_proof(root, &proofs[i][j - 1].node.label, path_proof) {
                     let err = anyhow!("verify path proof error");
                     bail!("verify commit proofs error {}", err);
@@ -283,11 +282,10 @@ impl Verifier {
                 }
 
                 copy_data(&mut label, &[id, &get_bytes(chals[i][0]), &get_bytes(idx)]);
-
+                
                 let mut size = front_side;
 
                 for p in &proofs[i][j - 1].parents {
-                    println!("label: {:?}", &proofs[i][j - 1].node.label[0..5]);
                     if p.index as i64 >= layer * self.expanders.n {
                         root = &p_node.commit_buf[index as usize + i as usize].roots[layer as usize]
                     } else {
@@ -304,13 +302,10 @@ impl Verifier {
                     label[(size as usize)..(size + HASH_SIZE) as usize].copy_from_slice(&p.label);
                     size += HASH_SIZE
                 }
-                // println!("get_hash(&label): {:?}", get_hash(&label));
-                // println!("=============================================");
-                // println!("&proofs[i][j - 1].node.label: {:?}", &proofs[i][j - 1].node.label);
-                // if !get_hash(&label).eq(&proofs[i][j - 1].node.label) {
-                //     let err = anyhow!("verify label error");
-                //     bail!("verify commit proofs error: {}", err);
-                // }
+                if !get_hash(&label).eq(&proofs[i][j - 1].node.label) {
+                    let err = anyhow!("verify label error");
+                    bail!("verify commit proofs error: {}", err);
+                }
             }
         }
         Ok(())
@@ -425,7 +420,7 @@ impl Verifier {
             let err = anyhow!("bad proof data");
             bail!("verify space proofs error: {}", err);
         }
-        let mut label: Vec<u8> = Vec::with_capacity(p_node.id.len() + 8 + HASH_SIZE as usize);
+        let mut label: Vec<u8> = vec![0; p_node.id.len() + 8 + HASH_SIZE as usize];
         for i in 0..proof.roots.len() {
             for j in 0..chals.len() {
                 if chals[j] != proof.proofs[i][j].index as i64 {
@@ -441,7 +436,6 @@ impl Verifier {
                     let err = anyhow!("verify index path error");
                     bail!("verify space proofs error: {}", err);
                 }
-
                 if !verify_path_proof(&proof.roots[i], &proof.proofs[i][j].label, path_proof) {
                     let err = anyhow!("verify path proof error");
                     bail!("verify space proofs error: {}", err);
@@ -517,7 +511,7 @@ impl Verifier {
         }
         let mut labels: Vec<Vec<u8>> = Vec::new();
         for i in 0..lens {
-            let mut label: Vec<u8> = Vec::with_capacity(id.len() + 8 + HASH_SIZE as usize);
+            let mut label: Vec<u8> = vec![0; id.len() + 8 + HASH_SIZE as usize];
             copy_data(
                 &mut label,
                 &[
