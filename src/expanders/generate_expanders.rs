@@ -20,11 +20,7 @@ pub fn calc_parents(expanders: &Expanders, node: &mut Node, miner_id: &[u8], cou
     let mut content: Vec<u8> = vec![0; lens];
     copy_data(
         &mut content,
-        &[
-            &miner_id,
-            &count.to_be_bytes(),
-            &layer.to_be_bytes(),
-        ],
+        &[&miner_id, &count.to_be_bytes(), &layer.to_be_bytes()],
     );
     node.add_parent(node.index - expanders.n as NodeType);
     let mut plate = vec![vec![]; 16];

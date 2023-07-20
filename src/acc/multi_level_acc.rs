@@ -65,8 +65,6 @@ pub fn verify_insert_update(
         } else {
             break;
         }
-        
-        
     }
 
     true

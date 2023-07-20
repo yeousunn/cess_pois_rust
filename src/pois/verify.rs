@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context, Ok, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use core::panic;
 use rand::Rng;
 use sha2::Digest;
@@ -87,18 +87,21 @@ impl Verifier {
     }
 
     pub fn logout_prover_node(&self, id: &[u8]) -> Result<(Vec<u8>, i64, i64)> {
-        let id = hex::encode(id);
-        let node = self
-            .nodes
-            .get(&id)
-            .with_context(|| format!("Node not found."))?;
+        let node = self.get_node(id);
 
-        let (acc, front, rear) = match &node.record {
-            Some(record) => (record.acc.clone(), record.front, record.rear),
-            None => panic!("Record not found."),
-        };
+        match node {
+            Ok(node) => {
+                let (acc, front, rear) = match &node.record {
+                    Some(record) => (record.acc.clone(), record.front, record.rear),
+                    None => panic!("Record not found."),
+                };
 
-        Ok((acc, front, rear))
+                Ok((acc, front, rear))
+            }
+            Err(err) => {
+                bail!(err);
+            }
+        }
     }
 
     pub fn receive_commits(&mut self, id: &[u8], commits: &mut [Commit]) -> bool {
@@ -170,11 +173,18 @@ impl Verifier {
     }
 
     pub fn commit_challenges(&mut self, id: &[u8], left: i32, right: i32) -> Result<Vec<Vec<i64>>> {
-        let id = hex::encode(id);
-        let p_node = self
-            .nodes
-            .get(&id)
-            .with_context(|| format!("Prover node not found"))?;
+        // let id = hex::encode(id);
+        // let p_node = self
+        //     .nodes
+        //     .get(&id)
+        //     .with_context(|| format!("Prover node not found"))?;
+
+        let p_node = match self.get_node(id) {
+            Ok(node) => node,
+            Err(err) => {
+                bail!(err);
+            }
+        };
 
         if right - left <= 0 || right > p_node.buf_size || left < 0 {
             let err = anyhow!("bad file number");
@@ -226,11 +236,17 @@ impl Verifier {
         chals: Vec<Vec<i64>>,
         proofs: Vec<Vec<CommitProof>>,
     ) -> Result<()> {
-        let id_str = hex::encode(id);
-        let p_node = self
-            .nodes
-            .get(&id_str)
-            .with_context(|| format!("verify commit proofs error: Prover node not found"))?;
+        // let id_str = hex::encode(id);
+        // let p_node = self
+        //     .nodes
+        //     .get(&id_str)
+        //     .with_context(|| format!("verify commit proofs error: Prover node not found"))?;
+        let p_node = match self.get_node(id) {
+            Ok(node) => node,
+            Err(err) => {
+                bail!(err);
+            }
+        };
 
         if chals.len() != proofs.len() || chals.len() > p_node.buf_size as usize {
             let err = anyhow!("bad proof data");
@@ -282,14 +298,15 @@ impl Verifier {
                 }
 
                 copy_data(&mut label, &[id, &get_bytes(chals[i][0]), &get_bytes(idx)]);
-                
+
                 let mut size = front_side;
 
                 for p in &proofs[i][j - 1].parents {
                     if p.index as i64 >= layer * self.expanders.n {
                         root = &p_node.commit_buf[index as usize + i as usize].roots[layer as usize]
                     } else {
-                        root = &p_node.commit_buf[index as usize + i as usize].roots[layer as usize - 1]
+                        root = &p_node.commit_buf[index as usize + i as usize].roots
+                            [layer as usize - 1]
                     }
                     let path_proof = PathProof {
                         locs: p.locs.clone(),

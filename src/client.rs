@@ -4,11 +4,6 @@ pub mod pois;
 pub mod tree;
 pub mod util;
 
-use anyhow::Result;
-use acc::multi_level_acc::WitnessNode;
-use bridge::bridge_client::BridgeClient;
-use bridge::{Challenge, Int64Slice, EmptyRequest};
-use pois::prove::{MhtProof, SpaceProof, DeletionProof};
 use crate::util::parse_key;
 use crate::{
     acc::RsaKey,
@@ -17,6 +12,11 @@ use crate::{
         verify::Verifier,
     },
 };
+use acc::multi_level_acc::WitnessNode;
+use anyhow::Result;
+use bridge::bridge_client::BridgeClient;
+use bridge::{Challenge, EmptyRequest, Int64Slice};
+use pois::prove::{DeletionProof, MhtProof, SpaceProof};
 
 pub mod bridge {
     tonic::include_proto!("bridge");
@@ -28,14 +28,14 @@ async fn main() -> Result<()> {
 
     let (mut verifier, key, id) = init_fields();
 
-    let request = tonic::Request::new(EmptyRequest {  });
+    let request = tonic::Request::new(EmptyRequest {});
     let response = client.call_get_commits(request).await?;
     let commit_group = response.into_inner();
     let mut commits = convert_to_commit(commit_group.commit);
     let acc_bytes = commit_group.prover_acc.unwrap().acc;
 
     verifier.register_prover_node(id, key.clone(), &acc_bytes, 0, 0);
-    
+
     if !verifier.receive_commits(id, &mut commits) {
         assert!(false);
     }
@@ -44,12 +44,15 @@ async fn main() -> Result<()> {
 
     if let Ok(chals) = result {
         let challenge = convert_to_challenge(chals.clone());
-        
+
         let request = tonic::Request::new(challenge);
         let response = client.call_prove_commit_and_acc(request).await?;
-       
+
         let commit_and_acc_proof = response.into_inner();
-        let commit_proof_group_inner = commit_and_acc_proof.commit_proof_group.unwrap().commit_proof_group_inner;
+        let commit_proof_group_inner = commit_and_acc_proof
+            .commit_proof_group
+            .unwrap()
+            .commit_proof_group_inner;
         let mut commit_proofs = Vec::new();
 
         for inner in commit_proof_group_inner {
@@ -60,16 +63,16 @@ async fn main() -> Result<()> {
             commit_proofs.push(commit_proof_row);
         }
 
-        if let Err(err) = verifier.verify_commit_proofs(id, chals.clone(), commit_proofs.clone()){
+        if let Err(err) = verifier.verify_commit_proofs(id, chals.clone(), commit_proofs.clone()) {
             println!("RESPONSE= {:?}", err);
         }
-        
+
         let pb_acc_proof = commit_and_acc_proof.acc_proof.unwrap();
         let acc_proof = convert_to_acc_proof(&pb_acc_proof);
-        if let Err(err) = verifier.verify_acc(id, chals, acc_proof){
+        if let Err(err) = verifier.verify_acc(id, chals, acc_proof) {
             println!("RESPONSE= {:?}", err);
         }
-    } 
+    }
 
     let space_chals = verifier.space_challenges(22);
     if let Ok(space_chals) = space_chals {
@@ -88,13 +91,19 @@ async fn main() -> Result<()> {
         }
     }
 
-    let request = tonic::Request::new(EmptyRequest {  });
-    let response = client.call_prove_deletion(request).await?;
-    let bridge_del_proof = response.into_inner();
-    let mut del_proof = convert_to_deletion_proof(&bridge_del_proof);
-    println!("del_proof: {:?}", del_proof);
-    if let Err(err) = verifier.verify_deletion(id, &mut del_proof) {
-        println!("RESPONSE= {:?}", err);
+    let request = tonic::Request::new(EmptyRequest {});
+    let response = client.call_prove_deletion(request).await;
+    match response {
+        Ok(response) => {
+            let bridge_del_proof = response.into_inner();
+            let mut del_proof = convert_to_deletion_proof(&bridge_del_proof);
+            if let Err(err) = verifier.verify_deletion(id, &mut del_proof) {
+                println!("RESPONSE= {:?}", err);
+            }
+        }
+        Err(e) => {
+            println!("RESPONSE= {:?}", e);
+        }
     }
     Ok(())
 }
@@ -136,13 +145,13 @@ pub fn convert_to_space_proof(message: &bridge::SpaceProof) -> SpaceProof {
     }
 
     let roots = message.roots.clone();
-    
+
     let mut wit_chains = Vec::new();
     for wit_chain in &message.wit_chains {
         let witness_node = convert_to_witness_node(wit_chain);
         wit_chains.push(witness_node);
     }
-    
+
     SpaceProof {
         left: message.left,
         right: message.right,
@@ -194,7 +203,11 @@ fn convert_to_mht_proof(pb_proof: &bridge::MhtProof) -> MhtProof {
 fn convert_to_commit_proof(pb_commit_proof: &bridge::CommitProof) -> CommitProof {
     CommitProof {
         node: convert_to_mht_proof(&pb_commit_proof.node.as_ref().unwrap()),
-        parents: pb_commit_proof.parents.iter().map(|pb_parent| convert_to_mht_proof(pb_parent)).collect(),
+        parents: pb_commit_proof
+            .parents
+            .iter()
+            .map(|pb_parent| convert_to_mht_proof(pb_parent))
+            .collect(),
     }
 }
 
@@ -216,7 +229,6 @@ fn convert_to_commit(commits: Vec<bridge::Commit>) -> Vec<Commit> {
 fn convert_to_challenge(chals: Vec<Vec<i64>>) -> Challenge {
     let mut challenge = Challenge::default();
     for row in chals {
-        
         let mut int64_slice = Int64Slice::default();
         int64_slice.values = row;
         challenge.rows.push(int64_slice);

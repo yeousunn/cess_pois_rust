@@ -15,10 +15,7 @@ pub struct RsaKey {
 }
 impl RsaKey {
     pub(crate) fn new(n: BigUint, g: BigUint) -> RsaKey {
-        Self {
-            n,
-            g,
-        }
+        Self { n, g }
     }
 }
 

@@ -2,7 +2,7 @@ use std::fs;
 
 use num_bigint_dig::BigUint;
 
-use crate::acc::{RsaKey, self};
+use crate::acc::{self, RsaKey};
 
 pub fn copy_data(target: &mut Vec<u8>, src: &[&[u8]]) {
     let mut count = 0;
