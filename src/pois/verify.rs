@@ -173,12 +173,6 @@ impl Verifier {
     }
 
     pub fn commit_challenges(&mut self, id: &[u8], left: i32, right: i32) -> Result<Vec<Vec<i64>>> {
-        // let id = hex::encode(id);
-        // let p_node = self
-        //     .nodes
-        //     .get(&id)
-        //     .with_context(|| format!("Prover node not found"))?;
-
         let p_node = match self.get_node(id) {
             Ok(node) => node,
             Err(err) => {
@@ -236,11 +230,6 @@ impl Verifier {
         chals: Vec<Vec<i64>>,
         proofs: Vec<Vec<CommitProof>>,
     ) -> Result<()> {
-        // let id_str = hex::encode(id);
-        // let p_node = self
-        //     .nodes
-        //     .get(&id_str)
-        //     .with_context(|| format!("verify commit proofs error: Prover node not found"))?;
         let p_node = match self.get_node(id) {
             Ok(node) => node,
             Err(err) => {

@@ -1,8 +1,8 @@
 use std::fs;
 
-use num_bigint_dig::BigUint;
-
 use crate::acc::{self, RsaKey};
+use anyhow::Result;
+use num_bigint_dig::BigUint;
 
 pub fn copy_data(target: &mut Vec<u8>, src: &[&[u8]]) {
     let mut count = 0;
@@ -18,7 +18,7 @@ pub fn copy_data(target: &mut Vec<u8>, src: &[&[u8]]) {
     }
 }
 
-pub fn parse_key(path: &str) -> Result<RsaKey, Box<dyn std::error::Error>> {
+pub fn parse_key(path: &str) -> Result<RsaKey> {
     let data = fs::read(path)?;
     Ok(get_key_from_bytes(&data))
 }
