@@ -5,7 +5,7 @@ option go_package = "bridge/";
 package bridge;
 
 service Bridge {
-    rpc CallGetCommits(EmptyRequest) returns (CommitGroup) {}
+    rpc CallGetCommits(EmptyRequest) returns (CommitsGroup) {}
     rpc CallProveCommitAndAcc(Challenge) returns (CommitAndAccProof) {}
     rpc CallProveSpace(Int64Slice) returns (SpaceProof) {}
     rpc CallProveDeletion(EmptyRequest) returns (DeletionProof) {}
@@ -63,13 +63,13 @@ message Challenge {
     repeated Int64Slice rows = 1;
 }
 
-message Commit {
-    int64 file_index = 1;
+message Commits {
+    repeated int64 file_indexs = 1;
     repeated bytes roots = 2;
 }
 
-message CommitGroup {
-    repeated Commit commit = 1;
+message CommitsGroup {
+    Commits commits = 1;
     
     // This is acc data to set the ProverNode
     ProverAcc prover_acc = 2;

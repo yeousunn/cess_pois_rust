@@ -8,7 +8,7 @@ use crate::util::parse_key;
 use crate::{
     acc::RsaKey,
     pois::{
-        prove::{AccProof, Commit, CommitProof},
+        prove::{AccProof, CommitProof, Commits},
         verify::Verifier,
     },
 };
@@ -25,22 +25,25 @@ pub mod bridge {
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut client = BridgeClient::connect("http://[::1]:50051").await?;
+    let limit = 1024*1024*100;
+    client = client
+        .max_decoding_message_size(limit)
+        .max_encoding_message_size(limit);
 
     let (mut verifier, key, id) = init_fields();
 
     let request = tonic::Request::new(EmptyRequest {});
     let response = client.call_get_commits(request).await?;
-    let commit_group = response.into_inner();
-    let mut commits = convert_to_commit(commit_group.commit);
-    let acc_bytes = commit_group.prover_acc.unwrap().acc;
+    let commits_group = response.into_inner();
+    let mut commits = convert_to_commits(commits_group.commits.unwrap());
+    let acc_bytes = commits_group.prover_acc.unwrap().acc;
 
     verifier.register_prover_node(id, key.clone(), &acc_bytes, 0, 0);
-
     if !verifier.receive_commits(id, &mut commits) {
         assert!(false);
     }
 
-    let result = verifier.commit_challenges(id, 0, 4);
+    let result = verifier.commit_challenges(id);
 
     if let Ok(chals) = result {
         let challenge = convert_to_challenge(chals.clone());
@@ -74,7 +77,7 @@ async fn main() -> Result<()> {
         }
     }
 
-    let space_chals = verifier.space_challenges(22);
+    let space_chals = verifier.space_challenges(8);
     if let Ok(space_chals) = space_chals {
         let mut int64_slice = Int64Slice::default();
         int64_slice.values = space_chals.clone();
@@ -86,7 +89,7 @@ async fn main() -> Result<()> {
 
         if let Ok(p_node) = verifier.get_node(id) {
             if let Err(err) = verifier.verify_space(p_node, space_chals, &mut space_proof) {
-                println!("A RESPONSE= {:?}", err);
+                println!("RESPONSE= {:?}", err);
             }
         }
     }
@@ -104,7 +107,7 @@ async fn main() -> Result<()> {
         Err(e) => {
             println!("RESPONSE= {:?}", e);
         }
-    }
+    }    
     Ok(())
 }
 
@@ -211,19 +214,11 @@ fn convert_to_commit_proof(pb_commit_proof: &bridge::CommitProof) -> CommitProof
     }
 }
 
-fn convert_to_commit(commits: Vec<bridge::Commit>) -> Vec<Commit> {
-    let mut converted_commits = Vec::new();
-
-    for commit in commits {
-        let converted_commit = Commit {
-            file_index: commit.file_index,
-            roots: commit.roots,
-        };
-
-        converted_commits.push(converted_commit);
+fn convert_to_commits(commits: bridge::Commits) -> Commits {
+    Commits {
+        file_indexs: commits.file_indexs,
+        roots: commits.roots,
     }
-
-    converted_commits
 }
 
 fn convert_to_challenge(chals: Vec<Vec<i64>>) -> Challenge {
@@ -238,7 +233,7 @@ fn convert_to_challenge(chals: Vec<Vec<i64>>) -> Challenge {
 }
 
 fn init_fields() -> (Verifier, RsaKey, &'static [u8]) {
-    let verifier = Verifier::new(1, 512, 32);
+    let verifier = Verifier::new(8, 512, 32);
     // let key = acc::rsa_keygen(2048);
     let key = parse_key("./key").unwrap();
     let id = b"test miner id";
