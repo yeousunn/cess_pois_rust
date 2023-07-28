@@ -56,7 +56,7 @@ pub fn calc_parents(expanders: &Expanders, node: &mut Node, miner_id: &[u8], cou
                         if !ok && p != node.index - expanders.n as NodeType {
                             break;
                         }
-                    } 
+                    }
 
                     let (_, ok) = node.parent_in_list(p);
                     if !ok {
