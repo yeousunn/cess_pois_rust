@@ -56,7 +56,7 @@ pub fn verify_insert_update(
                 vec![accs[count - 1].clone()],
             );
             if sub_acc != Some(accs[count].clone()) {
-                println!("verify sub acc error")
+                println!("verify sub acc error");
                 return false;
             }
             p = Some(*p_acc_inner);
