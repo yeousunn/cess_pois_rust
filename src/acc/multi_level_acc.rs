@@ -51,8 +51,8 @@ pub fn verify_insert_update(
         let p_acc = p_node.acc;
         if let Some(p_acc_inner) = p_acc {
             sub_acc = generate_acc(
-                &key.clone(),
-                &p_node.wit.clone(),
+                &key,
+                &p_node.wit,
                 vec![accs[count - 1].clone()],
             );
             if sub_acc != Some(accs[count].clone()) {
