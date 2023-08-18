@@ -50,11 +50,7 @@ pub fn verify_insert_update(
     while let Some(p_node) = p.and_then(|p| p.acc) {
         let p_acc = p_node.acc;
         if let Some(p_acc_inner) = p_acc {
-            sub_acc = generate_acc(
-                &key,
-                &p_node.wit,
-                vec![accs[count - 1].clone()],
-            );
+            sub_acc = generate_acc(&key, &p_node.wit, vec![accs[count - 1].clone()]);
             if sub_acc != Some(accs[count].clone()) {
                 println!("verify sub acc error");
                 return false;

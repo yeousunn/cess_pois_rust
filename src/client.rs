@@ -25,7 +25,7 @@ pub mod bridge {
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut client = BridgeClient::connect("http://[::1]:50051").await?;
-    let limit = 1024*1024*100;
+    let limit = 1024 * 1024 * 100;
     client = client
         .max_decoding_message_size(limit)
         .max_encoding_message_size(limit);
@@ -107,7 +107,7 @@ async fn main() -> Result<()> {
         Err(e) => {
             println!("RESPONSE= {:?}", e);
         }
-    }    
+    }
     Ok(())
 }
 
